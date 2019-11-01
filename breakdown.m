@@ -1,6 +1,7 @@
+close all;
 clear variables;
 
-U = 17.99;
+U = 1.0;
 
 Nx = 10;
 Ny = 10;
@@ -13,6 +14,9 @@ dR = 2;
 Ru = R0 * ones(Ny-1, Nx-1) + dR * rand(Ny-1, Nx-1);
 Rv = R0 * ones(Ny, Nx) + dR * rand(Ny, Nx);
 
+mRu = zeros(Ny-1, Nx-1);
+mRv = zeros(Ny, Nx);
+
 Iu = zeros(Ny-1, Nx-1);
 Iv = zeros(Ny, Nx);
 E = zeros(Ny-1, Nx);
@@ -20,8 +24,12 @@ nIu = length(Iu(:));
 nIv = length(Iv(:));
 nE = length(E(:));
 
+
+breakdownCurr = U / (Ny * epsilon * R0);
+
 nVar = nIu + nIv + nE;
 figure('Color', 'k');
+
 
 for t = 1 : 100
     A = zeros(nVar, nVar);
@@ -124,32 +132,7 @@ for t = 1 : 100
 
     minI = min([Iu(:);Iv(:)]);
     maxI = max([Iu(:);Iv(:)]);
-
-    clf;
-    for i = 1 : Ny - 1
-        for j = 1 : Nx - 1
-            y = Ny - i;
-            x = j - 1;
-            color = interp_color(Iu(i, j), minI, maxI);
-            line([x, x+1], [y, y], 'Color', color, 'LineWidth', 2);
-        end
-    end
-
-    for i = 1 : Ny
-        for j = 1 : Nx
-            x = j - 1;
-            y = Ny - i;
-            color = interp_color(Iv(i, j), minI, maxI);
-            line([x, x], [y, y+1], 'Color', color, 'LineWidth', 2);
-        end
-    end
-
-    axis equal tight;
-    axis off;
     
-    pause(0.01);
-    
-
     dEu = Iu .* Ru;
     dEv = Iv .* Rv;
 
@@ -157,7 +140,8 @@ for t = 1 : 100
     breakIndexV = find(dEv >= Ec);
     
     if length(breakIndexU) + length(breakIndexV) == 0
-        break;
+        U = U + 1.0;
+        continue;
     end
     
     for index = breakIndexU'
@@ -166,7 +150,11 @@ for t = 1 : 100
             i = Ny - 1;
         end
         j = 1 + (index - i) / (Ny - 1);
-        Ru(i, j) = epsilon * Ru(i, j);
+        
+        if eq(mRu(i, j), 0)
+            Ru(i, j) = epsilon * Ru(i, j);
+            mRu(i, j) = 1;
+        end
     end
 
     for index = breakIndexV'
@@ -175,7 +163,40 @@ for t = 1 : 100
             i = Ny;
         end
         j = 1 + (index - i) / Ny;
-        Rv(i, j) = epsilon * Rv(i, j);
+        
+        if eq(mRv(i, j), 0)
+            Rv(i, j) = epsilon * Rv(i, j);
+            mRv(i, j) = 1;
+        end
+    end
+
+    clf;
+    for i = 1 : Ny - 1
+        for j = 1 : Nx - 1
+            y = Ny - i;
+            x = j - 1;
+            color = interp_color(Iu(i, j), minI, maxI);
+            line([x, x+1], [y, y], 'Color', color, 'LineWidth', 2+2*mRu(i, j));
+        end
+    end
+
+    for i = 1 : Ny
+        for j = 1 : Nx
+            x = j - 1;
+            y = Ny - i;
+            color = interp_color(Iv(i, j), minI, maxI);
+            line([x, x], [y, y+1], 'Color', color, 'LineWidth', 2+2*mRv(i, j));
+        end
+    end
+
+    axis equal tight;
+    axis off;
+    
+    pause(0.01);
+    
+    if sum(Iv(1, :)) > breakdownCurr
+    %if sum(mRv(:)) >= Ny
+        break;
     end
 end
 
